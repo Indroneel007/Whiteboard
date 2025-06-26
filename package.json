@@ -1,0 +1,12 @@
+{
+  "name": "canvas-editor",
+  "version": "1.0.0",
+  "description": "A full-stack canvas editor application",
+  "scripts": {
+    "start": "concurrently \"cd frontend && npm run dev\" \"cd backend && node server.js\"",
+    "install-deps": "npm install && cd frontend && npm install && cd ../backend && npm install"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  }
+} 
