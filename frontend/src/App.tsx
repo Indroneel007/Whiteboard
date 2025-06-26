@@ -3,7 +3,7 @@ import { toPng } from 'html-to-image'
 import jsPDF from 'jspdf'
 import './App.css'
 
-const API_URL = 'http://localhost:3001/api'
+const API_URL = 'https://whiteboard-backend-1-ynjp.onrender.com/'
 
 interface CanvasElement {
   type: string;
