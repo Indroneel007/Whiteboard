@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { toPng } from 'html-to-image'
-import jsPDF from 'jspdf'
 import './App.css'
 
-//const API_URL = 'http://localhost:3001/api'
+// const API_URL = 'http://localhost:3001/api'
  const API_URL = 'https://whiteboard-backend-1-ynjp.onrender.com/api'
 interface CanvasElement {
   type: string;
@@ -390,7 +388,7 @@ function App() {
   }
 
   const exportPDF = async () => {
-    if (!previewRef.current) return;
+    if (!canvasId) return;
 
     try {
       // Show loading state
@@ -400,33 +398,27 @@ function App() {
         exportButton.textContent = 'Exporting...';
       }
 
-      // Convert the canvas to a PNG with optimized settings
-      const dataUrl = await toPng(previewRef.current, {
-        quality: 0.8, // Reduce quality for better compression
-        pixelRatio: 2, // Balance between quality and file size
-        skipAutoScale: true,
-        cacheBust: true,
+      const response = await fetch(`${API_URL}/canvas/export-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: canvasId }),
       });
 
-      // Create PDF with compression
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'px',
-        format: [previewRef.current.offsetWidth, previewRef.current.offsetHeight],
-        compress: true, // Enable PDF compression
-      });
+      if (!response.ok) {
+        throw new Error('Failed to export PDF');
+      }
 
-      // Calculate dimensions to maintain aspect ratio
-      const imgProps = pdf.getImageProperties(dataUrl);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-      // Add image to PDF with compression settings
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST', 0);
-
-      // Save the compressed PDF
-      const timestamp = Date.now();
-      pdf.save(`canvas-${canvasId}-${timestamp}.pdf`);
+      const data = await response.json();
+      
+      // Create a temporary link to download the PDF
+      const link = document.createElement('a');
+      link.href = `${API_URL}${data.url}`;
+      link.download = `canvas-${canvasId}-${Date.now()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
       // Reset button state
       if (exportButton) {
@@ -436,6 +428,13 @@ function App() {
     } catch (error) {
       console.error('Error exporting PDF:', error);
       alert('Failed to export PDF. Please try again.');
+      
+      // Reset button state on error
+      const exportButton = document.querySelector('.export-btn') as HTMLButtonElement;
+      if (exportButton) {
+        exportButton.disabled = false;
+        exportButton.textContent = 'Export as PDF';
+      }
     }
   };
 
