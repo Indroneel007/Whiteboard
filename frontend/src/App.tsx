@@ -414,7 +414,10 @@ function App() {
       
       // Create a temporary link to download the PDF
       const link = document.createElement('a');
-      link.href = `${API_URL}${data.url}`;
+      //link.href = `${API_URL}${data.url}`;
+      // Remove /api from the URL since static files are served from root
+      const baseUrl = API_URL.replace('/api', '');
+      link.href = `${baseUrl}${data.url}`;
       link.download = `canvas-${canvasId}-${Date.now()}.pdf`;
       document.body.appendChild(link);
       link.click();
