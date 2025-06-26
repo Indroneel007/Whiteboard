@@ -112,7 +112,46 @@ function App() {
 
   const handleMouseDown = async (e: React.MouseEvent) => {
     const coords = getCanvasCoordinates(e)
+    
+    // If we're already drawing, finalize the shape
+    if (isDrawing && currentElement) {
+        setIsDrawing(false)
+        try {
+            const elementToAdd = {
+                ...currentElement,
+                ...(currentElement.type === 'rectangle' && {
+                    width: currentElement.width,
+                    height: currentElement.height
+                }),
+                ...(currentElement.type === 'circle' && {
+                    radius: currentElement.radius
+                })
+            }
+            
+            await fetch(`${API_URL}/canvas/add-element`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    id: canvasId,
+                    element: elementToAdd
+                }),
+            })
+            updatePreview(canvasId)
+            setCurrentElement(null)
+            return
+        } catch (error) {
+            console.error('Error adding element:', error)
+        }
+    }
+
     startPosRef.current = coords
+
+    // Prevent starting new interaction if already dragging
+    if (isDragging) {
+        return;
+    }
 
     // Check if clicking on an existing element
     try {
@@ -126,7 +165,7 @@ function App() {
         })
       })
       const data = await response.json()
-      
+     // if (isDrawing || isDragging) return;
       if (data.element) {
         setIsDragging(true)
         setDraggedElement(data.element)
@@ -225,8 +264,13 @@ function App() {
         const x = Math.min(coords.x, startPosRef.current.x)
         const y = Math.min(coords.y, startPosRef.current.y)
         
+        // Only update if dimensions have changed
         setCurrentElement(prev => {
           if (!prev) return null
+          // If dimensions haven't changed, return previous state
+          if (prev.width === width && prev.height === height && prev.x === x && prev.y === y) {
+            return prev
+          }
           return {
             ...prev,
             x,
@@ -276,8 +320,8 @@ function App() {
       return
     }
 
+    // Don't finalize shape on mouse up anymore, it's handled in mouseDown
     if (!isDrawing || !currentElement) return
-    setIsDrawing(false)
 
     const coords = getCanvasCoordinates(e)
     let elementToAdd: CanvasElement | null = null
@@ -328,6 +372,50 @@ function App() {
 
     setCurrentElement(null)
   }
+
+  const handleMouseLeave = async (e: React.MouseEvent) => {
+    // If dragging, finalize position and sync with server
+    if (isDragging && draggedElement) {
+      const coords = getCanvasCoordinates(e);
+      const finalX = coords.x - dragOffset.x;
+      const finalY = coords.y - dragOffset.y;
+  
+      try {
+        await fetch(`${API_URL}/canvas/update-element`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: canvasId,
+            elementId: draggedElement.id,
+            x: finalX,
+            y: finalY,
+            type: draggedElement.type,
+            color: draggedElement.color,
+            isFilled: draggedElement.isFilled,
+            ...(draggedElement.type === 'circle' && { radius: draggedElement.radius }),
+            ...(draggedElement.type === 'rectangle' && {
+              width: draggedElement.width,
+              height: draggedElement.height,
+            }),
+          }),
+        });
+        updatePreview(canvasId);
+      } catch (error) {
+        console.error('Error finalizing drag on mouse leave:', error);
+      }
+  
+      setIsDragging(false);
+      setDraggedElement(null);
+      setDragOffset({ x: 0, y: 0 });
+      return;
+    }
+  
+    // If drawing, cancel drawing session
+    if (isDrawing) {
+      setIsDrawing(false);
+      setCurrentElement(null);
+    }
+  };
 
   const updatePreview = async (id: string) => {
     try {
@@ -633,7 +721,7 @@ function App() {
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
             style={{ cursor: elementType === 'text' ? 'text' : 'crosshair' }}
           >
             <img
